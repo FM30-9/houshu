@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <title>給料計算（履歴つき版）</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 30px;
+            line-height: 2;
+        }
+
+        input,
+        button {
+            padding: 8px;
+            font-size: 16px;
+            margin: 5px 0;
+        }
+
+        /* 履歴のリストの見た目を少し整える */
+        ul {
+            padding-left: 20px;
+            color: #555;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>給料計算ツール</h1>
+
+    <div>
+        日給：<input type="number" id="dailyWage" value="6192"> 円
+    </div>
+
+    <button onclick="addDay()">今日働いた（日数を＋1）</button>
+
+    <h2>働いた日数: <span id="dayCount">0</span> 日</h2>
+    <h2>合計給料: <span id="totalSalary">0</span> 円</h2>
+
+    <button onclick="resetData()">最初からやり直す</button>
+
+    <h3>勤務日の記録</h3>
+    <ul id="historyList"></ul>
+
+    <script>
+        // データを読み込み、なければ初期化
+        let days = Number(localStorage.getItem('days')) || 0;
+        // ★追加：保存された履歴（HTMLの文字）を読み込む
+        let historyHtml = localStorage.getItem('history') || '';
+
+        // 画面の初期表示
+        updateDisplay();
+
+        // --- 働いた日をカウントする処理 ---
+        function addDay() {
+            days += 1;
+
+            // ★追加：今日の日付（例: 2026/6/14）を自動で取得する
+            const today = new Date().toLocaleDateString();
+
+            // ★追加：日付を <li>タグ で囲って、これまでの履歴の「後ろ（1番下）」に付け足す
+            historyHtml += `<li>${today}</li>`;
+
+            saveAndDisplay();
+        }
+
+        // --- 保存して表示を更新する処理 ---
+        function saveAndDisplay() {
+            localStorage.setItem('days', days);
+            localStorage.setItem('history', historyHtml); // ★追加：履歴を保存
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            const wage = document.getElementById('dailyWage').value;
+            document.getElementById('dayCount').textContent = days;
+            document.getElementById('totalSalary').textContent = days * wage;
+
+            // ★追加：履歴のエリアの HTML を書き換える
+            document.getElementById('historyList').innerHTML = historyHtml;
+        }
+
+        // --- リセット ---
+        function resetData() {
+            days = 0;
+            historyHtml = ''; // ★追加：履歴を空にする
+            localStorage.removeItem('days');
+            localStorage.removeItem('history'); // ★追加
+            updateDisplay();
+        }
+    </script>
+</body>
+
+</html>
