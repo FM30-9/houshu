@@ -3,93 +3,665 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>給料計算（履歴つき版）</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>給与管理アプリ</title>
     <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --brand-color: #4f46e5;
+            --brand-light: #eeebff;
+
+            /* ステータスカラー */
+            --sched-bg: #fffbeb;
+            --sched-text: #b45309;
+            --sched-border: #f59e0b;
+            --sched-hover: #fde68a;
+
+            --comp-bg: #ecfdf5;
+            --comp-text: #047857;
+            --comp-border: #10b981;
+            --comp-hover: #d1fae5;
+
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+        }
+
         body {
-            font-family: sans-serif;
-            margin: 30px;
-            line-height: 2;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            -webkit-font-smoothing: antialiased;
         }
 
-        input,
-        button {
-            padding: 8px;
-            font-size: 16px;
-            margin: 5px 0;
+        .container {
+            width: 100%;
+            max-width: 440px;
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 10px 15px -3px rgba(0, 0, 0, 0.03);
+            box-sizing: border-box;
         }
 
-        /* 履歴のリストの見た目を少し整える */
-        ul {
-            padding-left: 20px;
-            color: #555;
+        /* タブナビゲーション */
+        .nav-tabs {
+            display: flex;
+            background: #f1f5f9;
+            border-radius: 10px;
+            padding: 4px;
+            margin-bottom: 24px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            border: none;
+            background: none;
+            padding: 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: background-color 0.15s ease, color 0.15s ease;
+        }
+
+        .tab-btn.active {
+            background: var(--card-bg);
+            color: var(--brand-color);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        h2 {
+            font-size: 0.95rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-top: 0;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+        }
+
+        .count-badge {
+            font-size: 0.8rem;
+            font-weight: 500;
+            background: #f1f5f9;
+            color: var(--text-muted);
+            padding: 2px 8px;
+            border-radius: 20px;
+            margin-left: 6px;
+        }
+
+        /* サマリーカード */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .summary-card {
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
+            padding: 14px;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .summary-card.featured {
+            background: linear-gradient(145deg, #fbfbfe, var(--brand-light));
+            border-color: rgba(79, 70, 229, 0.15);
+        }
+
+        .card-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .card-value {
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+
+        .featured .card-value {
+            color: var(--brand-color);
+        }
+
+        /* 縦型リスト（確定待ち用） */
+        .list-container {
+            max-height: 200px;
+            overflow-y: auto;
+            padding-right: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .list-container::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .list-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .list-container::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+
+        .day-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            user-select: none;
+            box-sizing: border-box;
+        }
+
+        /* 確定待ち（ホバー時は動かさず色変化のみ） */
+        .day-row.scheduled {
+            border-left: 4px solid var(--sched-border);
+            background-color: var(--sched-bg);
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+
+        .day-row.scheduled:hover {
+            background-color: var(--sched-hover);
+        }
+
+        /* ================= 完了済み実績（3列グリッドレイアウト） ================= */
+        #completedList {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            max-height: 180px;
+            overflow-y: auto;
+        }
+
+        #completedList .day-row.completed {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 8px 4px;
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            color: #94a3b8;
+            font-size: 0.75rem;
+            cursor: default;
+        }
+
+        .status-text {
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .scheduled .status-text {
+            color: var(--sched-text);
+        }
+
+        #completedList .status-text {
+            color: #cbd5e1;
+            font-weight: 500;
+            margin-top: 2px;
+            font-size: 0.7rem;
+        }
+
+        /* ================= カレンダー（スクロールレス・レスポンシブ） ================= */
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .calendar-header h3 {
+            margin: 0;
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .month-btn {
+            background: #f1f5f9;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            transition: background-color 0.15s;
+        }
+
+        .month-btn:hover {
+            background: #e2e8f0;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+            background: #f8fafc;
+            padding: 6px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-sizing: border-box;
+        }
+
+        .calendar-weekday {
+            text-align: center;
+            font-weight: 700;
+            font-size: 0.65rem;
+            padding: 4px 0;
+            color: var(--text-muted);
+        }
+
+        .calendar-day {
+            aspect-ratio: 1 / 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 2px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 700;
+            user-select: none;
+            transition: background-color 0.15s ease;
+            box-sizing: border-box;
+        }
+
+        /* カレンダーホバー（動かさず、各ステータスに応じた色変化） */
+        .calendar-day.none:hover {
+            background-color: #f1f5f9;
+        }
+
+        .calendar-day.scheduled:hover {
+            background-color: var(--sched-hover);
+        }
+
+        .calendar-day.completed:hover {
+            background-color: var(--comp-hover);
+        }
+
+        .calendar-day.none {
+            border-top: 2px solid #cbd5e1;
+        }
+
+        .calendar-day.scheduled {
+            border-top: 2px solid var(--sched-border);
+            background-color: var(--sched-bg);
+            color: var(--sched-text);
+        }
+
+        .calendar-day.completed {
+            border-top: 2px solid var(--comp-border);
+            background-color: var(--comp-bg);
+            color: var(--comp-text);
+        }
+
+        .day-dot {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+        }
+
+        .none .day-dot {
+            background: transparent;
+        }
+
+        .scheduled .day-dot {
+            background: var(--sched-border);
+        }
+
+        .completed .day-dot {
+            background: var(--comp-border);
+        }
+
+        .empty-message {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 16px;
+            font-style: italic;
+            font-size: 0.8rem;
+            border: 1px dashed var(--border-color);
+            border-radius: 10px;
+            grid-column: span 3;
+            /* グリッド表示時にも崩れないように調整 */
+        }
+
+        /* ================= スマホ画面用の微調整（レスポンシブ） ================= */
+        @media (max-width: 400px) {
+            body {
+                padding: 8px;
+            }
+
+            .container {
+                padding: 16px;
+                border-radius: 12px;
+            }
+
+            .summary-grid {
+                margin-bottom: 16px;
+                gap: 8px;
+            }
+
+            .summary-card {
+                padding: 10px;
+            }
+
+            .card-value {
+                font-size: 1.1rem;
+            }
+
+            h2 {
+                font-size: 0.85rem;
+                margin-bottom: 8px;
+            }
+
+            .calendar-grid {
+                gap: 3px;
+                padding: 4px;
+            }
+
+            .calendar-day {
+                font-size: 0.75rem;
+            }
+
+            #completedList .day-row.completed {
+                font-size: 0.7rem;
+                padding: 6px 2px;
+            }
         }
     </style>
 </head>
 
 <body>
 
-    <h1>給料計算ツール</h1>
+    <div class="container">
+        <!-- ナびゲーション -->
+        <nav class="nav-tabs">
+            <button class="tab-btn active" onclick="switchPage('top')">ダッシュボード</button>
+            <button class="tab-btn" onclick="switchPage('calendar')">カレンダー</button>
+        </nav>
 
-    <div>
-        日給：<input type="number" id="dailyWage" value="6192"> 円
+        <!-- ================= トップページ ================= -->
+        <div id="topPage" class="page active">
+            <!-- サマリーカード -->
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <span class="card-label"><span id="currentMonthLabel">--</span>月の給与</span>
+                    <span class="card-value" id="monthSalary">¥0</span>
+                </div>
+                <div class="summary-card featured">
+                    <span class="card-label">これまでの合計</span>
+                    <span class="card-value" id="totalSalary">¥0</span>
+                </div>
+            </div>
+
+            <h2>確定待ちの予定</h2>
+            <div class="list-container" id="scheduledList" style="margin-bottom: 24px;">
+                <!-- 予定日リスト -->
+            </div>
+
+            <h2>完了済みの勤務 <span id="completedCount" class="count-badge">0日</span></h2>
+            <div class="list-container" id="completedList">
+                <!-- 3列グリッドで表示 -->
+            </div>
+        </div>
+
+        <!-- ================= カレンダーページ ================= -->
+        <div id="calendarPage" class="page">
+            <div class="calendar-header">
+                <button class="month-btn" onclick="changeMonth(-1)">前月</button>
+                <h3 id="calendarTitle">2026年 06月</h3>
+                <button class="month-btn" onclick="changeMonth(1)">次月</button>
+            </div>
+            <p
+                style="font-size: 0.75rem; color: var(--text-muted); margin-top: -8px; margin-bottom: 12px; text-align: center;">
+                タップ: なし ➔ 予定(黄) ➔ 完了(緑)
+            </p>
+
+            <div class="calendar-grid" id="calendarList">
+                <!-- 7列カレンダー -->
+            </div>
+        </div>
     </div>
 
-    <button onclick="addDay()">今日働いた（日数を＋1）</button>
-
-    <h2>働いた日数: <span id="dayCount">0</span> 日</h2>
-    <h2>合計給料: <span id="totalSalary">0</span> 円</h2>
-
-    <button onclick="resetData()">最初からやり直す</button>
-
-    <h3>勤務日の記録</h3>
-    <ul id="historyList"></ul>
-
     <script>
-        // データを読み込み、なければ初期化
-        let days = Number(localStorage.getItem('days')) || 0;
-        // ★追加：保存された履歴（HTMLの文字）を読み込む
-        let historyHtml = localStorage.getItem('history') || '';
+        // --- 状態管理 (機能・データ構造は完全維持) ---
+        const appState = {
+            dailyRate: 6192,
+            days: {}
+        };
 
-        // 画面の初期表示
-        updateDisplay();
+        let displayYear = new Date().getFullYear();
+        let displayMonth = new Date().getMonth();
 
-        // --- 働いた日をカウントする処理 ---
-        function addDay() {
-            days += 1;
+        const currentMonthLabelEl = document.getElementById('currentMonthLabel');
+        const monthSalaryEl = document.getElementById('monthSalary');
+        const totalSalaryEl = document.getElementById('totalSalary');
+        const scheduledListEl = document.getElementById('scheduledList');
+        const completedListEl = document.getElementById('completedList');
+        const completedCountEl = document.getElementById('completedCount');
+        const calendarTitleEl = document.getElementById('calendarTitle');
+        const calendarListEl = document.getElementById('calendarList');
 
-            // ★追加：今日の日付（例: 2026/6/14）を自動で取得する
-            const today = new Date().toLocaleDateString();
-
-            // ★追加：日付を <li>タグ で囲って、これまでの履歴の「後ろ（1番下）」に付け足す
-            historyHtml += `<li>${today}</li>`;
-
-            saveAndDisplay();
+        function init() {
+            loadFromLocalStorage();
+            renderTopPage();
+            renderCalendarPage();
         }
 
-        // --- 保存して表示を更新する処理 ---
-        function saveAndDisplay() {
-            localStorage.setItem('days', days);
-            localStorage.setItem('history', historyHtml); // ★追加：履歴を保存
-            updateDisplay();
+        function switchPage(pageName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+
+            if (pageName === 'top') {
+                document.querySelectorAll('.tab-btn')[0].classList.add('active');
+                document.getElementById('topPage').classList.add('active');
+                renderTopPage();
+            } else {
+                document.querySelectorAll('.tab-btn')[1].classList.add('active');
+                document.getElementById('calendarPage').classList.add('active');
+                renderCalendarPage();
+            }
         }
 
-        function updateDisplay() {
-            const wage = document.getElementById('dailyWage').value;
-            document.getElementById('dayCount').textContent = days;
-            document.getElementById('totalSalary').textContent = days * wage;
+        function renderTopPage() {
+            const now = new Date();
+            const thisYear = now.getFullYear();
+            const thisMonth = now.getMonth();
 
-            // ★追加：履歴のエリアの HTML を書き換える
-            document.getElementById('historyList').innerHTML = historyHtml;
+            currentMonthLabelEl.textContent = thisMonth + 1;
+
+            let totalCompletedDays = 0;
+            let monthCompletedDays = 0;
+
+            scheduledListEl.innerHTML = '';
+            completedListEl.innerHTML = '';
+
+            const scheduledDaysArray = [];
+            const completedDaysArray = [];
+
+            Object.keys(appState.days).forEach(dateStr => {
+                const status = appState.days[dateStr];
+
+                if (status === 'completed') {
+                    totalCompletedDays++;
+                    const prefix = `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}`;
+                    if (dateStr.startsWith(prefix)) {
+                        monthCompletedDays++;
+                    }
+                    completedDaysArray.push(dateStr);
+                }
+                if (status === 'scheduled') {
+                    scheduledDaysArray.push(dateStr);
+                }
+            });
+
+            monthSalaryEl.textContent = `¥${(monthCompletedDays * appState.dailyRate).toLocaleString()}`;
+            totalSalaryEl.textContent = `¥${(totalCompletedDays * appState.dailyRate).toLocaleString()}`;
+
+            completedCountEl.textContent = `${completedDaysArray.length}日`;
+
+            // 1. 確定待ちリスト
+            if (scheduledDaysArray.length === 0) {
+                scheduledListEl.innerHTML = `<div class="empty-message">確定待ちの予定はありません</div>`;
+            } else {
+                scheduledDaysArray.sort().forEach(dateStr => {
+                    const [y, m, d] = dateStr.split('-');
+                    const dayOfWeek = new Date(y, m - 1, d).toLocaleDateString('ja-JP', { weekday: 'short' });
+
+                    const row = document.createElement('div');
+                    row.className = `day-row scheduled`;
+                    row.innerHTML = `
+                    <div class="date-info"><strong>${parseInt(m)}月${parseInt(d)}日</strong> <span style="font-size:0.8rem; color:var(--text-muted);">(${dayOfWeek})</span></div>
+                    <div class="status-text">確定 ➔</div>
+                `;
+                    row.addEventListener('click', () => {
+                        appState.days[dateStr] = 'completed';
+                        saveToLocalStorage();
+                        renderTopPage();
+                    });
+                    scheduledListEl.appendChild(row);
+                });
+            }
+
+            // 2. 完了済みリスト（3列グリッド対応）
+            if (completedDaysArray.length === 0) {
+                completedListEl.innerHTML = `<div class="empty-message">実績はありません</div>`;
+            } else {
+                completedDaysArray.sort().reverse().forEach(dateStr => {
+                    const [y, m, d] = dateStr.split('-');
+                    const dayOfWeek = new Date(y, m - 1, d).toLocaleDateString('ja-JP', { weekday: 'short' });
+
+                    const row = document.createElement('div');
+                    row.className = `day-row completed`;
+                    row.innerHTML = `
+                    <div class="date-info"><strong>${parseInt(m)}/${parseInt(d)}</strong> (${dayOfWeek})</div>
+                    <div class="status-text">完了</div>
+                `;
+                    completedListEl.appendChild(row);
+                });
+            }
         }
 
-        // --- リセット ---
-        function resetData() {
-            days = 0;
-            historyHtml = ''; // ★追加：履歴を空にする
-            localStorage.removeItem('days');
-            localStorage.removeItem('history'); // ★追加
-            updateDisplay();
+        function renderCalendarPage() {
+            calendarTitleEl.textContent = `${displayYear}年 ${String(displayMonth + 1).padStart(2, '0')}月`;
+            calendarListEl.innerHTML = '';
+
+            const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+            weekdays.forEach(w => {
+                const h = document.createElement('div');
+                h.className = 'calendar-weekday';
+                h.textContent = w;
+                if (w === '日') h.style.color = '#ef4444';
+                if (w === '土') h.style.color = '#3b82f6';
+                calendarListEl.appendChild(h);
+            });
+
+            const firstDayIndex = new Date(displayYear, displayMonth, 1).getDay();
+            const daysInMonth = new Date(displayYear, displayMonth + 1, 0).getDate();
+
+            for (let i = 0; i < firstDayIndex; i++) {
+                const emptyCell = document.createElement('div');
+                calendarListEl.appendChild(emptyCell);
+            }
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateStr = `${displayYear}-${String(displayMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+                if (!appState.days[dateStr]) {
+                    appState.days[dateStr] = 'none';
+                }
+
+                const currentStatus = appState.days[dateStr];
+
+                const cell = document.createElement('div');
+                cell.className = `calendar-day ${currentStatus}`;
+                cell.innerHTML = `
+                <div class="day-number">${d}</div>
+                <div class="day-dot"></div>
+            `;
+
+                cell.addEventListener('click', () => {
+                    if (currentStatus === 'none') {
+                        appState.days[dateStr] = 'scheduled';
+                    } else if (currentStatus === 'scheduled') {
+                        appState.days[dateStr] = 'completed';
+                    } else {
+                        appState.days[dateStr] = 'none';
+                    }
+                    saveToLocalStorage();
+                    renderCalendarPage();
+                });
+
+                calendarListEl.appendChild(cell);
+            }
         }
+
+        function changeMonth(offset) {
+            displayMonth += offset;
+            if (displayMonth > 11) {
+                displayMonth = 0;
+                displayYear++;
+            } else if (displayMonth < 0) {
+                displayMonth = 11;
+                displayYear--;
+            }
+            renderCalendarPage();
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem('salary_app_v5_data', JSON.stringify(appState));
+        }
+
+        function loadFromLocalStorage() {
+            const saved = localStorage.getItem('salary_app_v5_data');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    appState.days = parsed.days || {};
+                } catch (e) {
+                    console.error("データの読み込みに失敗しました", e);
+                }
+            }
+            appState.dailyRate = 6192;
+        }
+
+        init();
     </script>
 </body>
 
